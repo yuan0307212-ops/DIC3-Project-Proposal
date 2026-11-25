@@ -1,0 +1,417 @@
+An Indoor Navigation Task-Decision Agent for TurtleBot3 Burger: Design and Offline Prototype Evaluation
+
+Personal Assignment — DIC4 | Submitted by: Chiu Li-Mei (邱秝美), Student ID 7115064159
+Based on group project by Group 7, source commit: 1c322b8 (hank050392/tb3-navigation-agent, main)
+
+─────────────────────────────────────────────────────────────────────────────
+ABSTRACT
+─────────────────────────────────────────────────────────────────────────────
+
+Indoor mobile robots require not only path planning and obstacle avoidance, but also
+accurate understanding of user-issued tasks. This paper presents the design and offline
+prototype evaluation of a task-decision agent for TurtleBot3 Burger, an accessible
+differential-drive robot commonly used in ROS 2 research. The proposed agent accepts
+Chinese-language destination commands, structures them into validated task schemas,
+performs landmark whitelist verification and robot status checks, dispatches navigation
+goals to the Nav2 stack, and reports results grounded in action-server feedback. We
+define three system components—intent parsing, task validation, and navigation
+dispatch—and implement offline contract verification covering seven distinct outcome
+states: ARRIVED, CLARIFY, NOT_READY, NO_PATH, FAILED, TIMEOUT, and CANCELED. All nine
+unit tests pass on the implemented offline prototype. LLM integration, ROS 2/Nav2
+connection, and physical robot experiments remain as planned work. We present the system
+architecture, the implemented offline logic, representative test cases with actual
+observed outputs, and an evaluation design for the full system. The paper is honest
+about the boundary between implemented offline behavior and planned integration.
+
+Index Terms: indoor navigation, task-decision agent, TurtleBot3, ROS 2, Nav2, natural
+language interface, Chinese command processing, robot task management
+
+─────────────────────────────────────────────────────────────────────────────
+I. INTRODUCTION
+─────────────────────────────────────────────────────────────────────────────
+
+TurtleBot3 Burger is a low-cost differential-drive robot widely used in robotics
+education and ROS 2 research. Its standard navigation stack—Nav2 combined with SLAM
+Toolbox—handles path planning and obstacle avoidance reliably in pre-mapped indoor
+environments [4][5]. However, bridging human language to executable navigation goals
+introduces additional challenges: natural language destination references may be
+ambiguous, robot status may be stale, path feasibility must be confirmed before
+dispatch, and mission outcomes must be reported with traceable evidence.
+
+Existing work on language-grounded robot navigation has demonstrated that large language
+models (LLMs) can parse task requests and select robot actions [1][2]. Recent studies
+further highlight that latency in LLM-to-ROS-2 integration remains a practical concern
+[3]. The BARN Challenge continues to benchmark navigation reliability in constrained
+environments [6][12], demonstrating that physical execution quality cannot be inferred
+from language-layer success alone.
+
+This paper addresses the following problem: given a Chinese-language instruction from a
+novice user, a registered set of named indoor locations, a pre-built occupancy map, and
+a live robot status, the agent must decide whether to request clarification, pre-empt
+dispatch due to robot unavailability, send a validated navigation goal, and produce a
+result report grounded in the navigation action result—not in a language-model guess.
+
+This work is a personal academic exercise (DIC4 course assignment) reporting on the
+offline prototype contribution of Group 7's project. The original group project was
+developed collaboratively; this paper focuses on the design rationale, offline
+implementation, and evaluation plan, and attributes the broader project appropriately.
+
+The main contributions of this paper are:
+(1) A structured task-decision architecture separating intent parsing, domain validation,
+    and navigation dispatch from the underlying Nav2 stack.
+(2) An offline prototype implementing landmark whitelist validation and seven mock
+    outcome states, verified by nine passing unit tests.
+(3) Representative test case results with actual command inputs and observed JSON outputs.
+(4) A comparative evaluation design (B0/B1/B2) with defined metrics and ablations for
+    future full-system experiments.
+
+─────────────────────────────────────────────────────────────────────────────
+II. RELATED WORK
+─────────────────────────────────────────────────────────────────────────────
+
+A. Language Models and Robot Task Planning
+
+ReAct [1] demonstrates that interleaving reasoning traces and tool-use actions improves
+LLM task completion on structured environments. SayCan [2] grounds robot affordances in
+language model outputs by filtering actions to those physically feasible for the robot.
+Both approaches motivate the design principle that language understanding should be
+separated from physical execution and constrained to actions the system can actually
+perform.
+
+Pollini et al. [3] specifically address LLM-to-ROS-2 latency, showing that command
+processing delay is a practical concern for real-time robot interaction. This motivates
+our decision to track separate timing components (parse latency, dispatch latency, and
+feedback latency) in the planned evaluation.
+
+B. Navigation Stack and Benchmarks
+
+The Nav2 navigation system [4] provides a behavior-tree-based architecture for path
+planning, controller execution, and recovery behaviors. SLAM Toolbox [5] offers
+efficient 2D mapping and localization suitable for TurtleBot3 Burger in pre-built
+indoor maps. Both are integral to the planned system integration.
+
+The BARN Challenge [6][12] benchmarks navigation reliability in constrained environments
+across classical and learned planners. NavBench [7] provides a unified reinforcement-
+learning navigation benchmark. These benchmarks establish that navigation success rates
+are environment- and configuration-dependent, supporting our decision to report
+navigation metrics separately from language-layer metrics.
+
+C. TurtleBot3 Platform
+
+ROBOTIS documentation [8] specifies TurtleBot3 Burger hardware: a 2D LiDAR (LDS-01 or
+LDS-02 depending on version), two Dynamixel servos, and an onboard Raspberry Pi.
+Physical sensor limitations—LiDAR blind zones, 2D-only plane detection, wheel odometry
+drift—are acknowledged in the design as factors that must be measured during integration
+rather than assumed constant.
+
+─────────────────────────────────────────────────────────────────────────────
+III. SYSTEM ARCHITECTURE AND METHOD
+─────────────────────────────────────────────────────────────────────────────
+
+A. Overview
+
+The proposed system follows a layered architecture with five modules: (1) Chinese Input
+and Intent Parser, (2) Task Agent and Planner, (3) Domain Knowledge and Validation,
+(4) Navigation Dispatch (Nav2 Adapter), and (5) Result Reporting. Figure 1 shows the
+complete planned architecture, clearly distinguishing implemented components from planned
+integration.
+
+[Figure 1: System Architecture Diagram]
+Implemented in offline prototype (solid lines):
+  - Task schema validation (validate_request)
+  - Landmark whitelist lookup (config/landmarks.json)
+  - Mock scenario branching (run_demo with 7 outcome states)
+  - JSON evidence output
+
+Planned integration (dashed lines):
+  - LLM structured intent parsing (src/intent_parser.py — not yet implemented)
+  - Mission manager with single-active-goal enforcement (src/mission_manager.py — planned)
+  - ROS 2 / Nav2 adapter (src/nav2_adapter.py — planned)
+  - Live sensor status checks (localization freshness, TF validity)
+  - Navigation action server feedback and result monitoring
+
+B. Task Flow
+
+The agent operates as follows. Upon receiving a Chinese-language user input, the LLM
+intent parser produces a structured JSON object with fields "intent" and either
+"landmark_id" (for navigate) or "question"/"reason" (for clarify/reject). This object
+is validated against per-intent field schemas and a landmark whitelist derived from
+config/landmarks.json. If validation fails, the task is rejected without navigation
+dispatch. If the intent is "clarify", the agent returns a CLARIFY response without
+dispatching. Otherwise, the agent checks robot status (localization freshness, sensor
+data freshness, single active mission constraint). If checks fail, NOT_READY or BUSY
+is returned. Path feasibility is queried; NO_PATH is returned if no valid path exists.
+Only after all checks pass is the navigation goal sent to Nav2. The agent monitors
+navigation feedback and returns ARRIVED, FAILED, TIMEOUT, or CANCELED based on
+the action result, never on a language model assumption.
+
+C. Task Schema
+
+The offline prototype validates the following intent schema:
+  - navigate: {"intent": "navigate", "landmark_id": <registered_id>}
+  - cancel:   {"intent": "cancel"}
+  - clarify:  {"intent": "clarify", "question": <non-empty string>}
+  - reject:   {"intent": "reject",  "reason":   <non-empty string>}
+
+Extra fields in any request are rejected. Landmark IDs must appear in the registered
+whitelist (config/landmarks.json). The offline demo landmarks are: "desk" (實驗桌,
+x=1.0, y=1.0), "door_a" (A門口, x=2.0, y=0.0), "door_b" (B門口, x=0.0, y=2.0).
+All coordinates are offline demo values and must be re-registered for physical deployment.
+
+D. Algorithm
+
+The core task-decision algorithm (Algorithm 1) is specified in DESIGN.md:
+
+  Input:  query Q, landmark registry K, robot status S
+  Output: mission result R with evidence E
+
+  01: if Q is explicit cancel → cancel active goal; return CANCELED with stop_confirmed=false
+  02: reject new movement request if another mission is active → return BUSY
+  03: read K; retrieve relevant domain rules
+  04: parse Q into schema-constrained intent via LLM
+  05: if parsing fails or timeout → return CLARIFY or error
+  06: if intent is ambiguous → ask user; return CLARIFY
+  07: validate tool name, landmark_id, schema against allowlists
+  08: if validation fails → return REJECTED (no goal sent)
+  09: read scan, localization, TF and navigation lifecycle status
+  10: if data are stale or checks fail → return NOT_READY with evidence
+  11: resolve landmark_id to registered pose in map frame
+  12: request path feasibility check with bounded timeout
+  13: if no valid path → return NO_PATH (no goal sent)
+  14: send validated goal through navigation adapter
+  15–24: monitor mission until deadline; handle ARRIVED, FAILED, CANCELED, TIMEOUT
+  25: if deadline expires → cancel goal; return TIMEOUT
+  26: return observed terminal result with evidence; never substitute LLM guess
+
+Steps 01–08 and evidence output are implemented in the offline prototype.
+Steps 09–26 (live sensor checks, path feasibility, Nav2 dispatch, feedback monitoring)
+are planned.
+
+─────────────────────────────────────────────────────────────────────────────
+IV. PROTOTYPE IMPLEMENTATION
+─────────────────────────────────────────────────────────────────────────────
+
+A. Implementation Scope
+
+The offline prototype is implemented in Python 3.10+ using only the standard library.
+No API keys, ROS 2, Gazebo, or third-party Python packages are required to run the
+prototype. The entry point is src/agent_demo.py; task validation logic is in
+validate_request(); scenario branching is in run_demo().
+
+B. Offline Landmark Registry
+
+The landmark registry (config/landmarks.json) stores three named locations with
+Cartesian coordinates and Chinese labels. The registry acts as the destination
+whitelist: any landmark_id not present in the registry causes immediate rejection.
+Coordinates are for offline demonstration only and do not represent a real physical map.
+
+C. Executed Test Results
+
+All test scenarios were executed using the commands documented in the README. The
+following table summarizes the actual observed outputs (source commit 1c322b8):
+
+[Table I: Offline Demo Scenario Results]
+
+| Scenario      | Command Input                         | Observed status | goal_sent |
+|---------------|---------------------------------------|-----------------|-----------|
+| Normal nav    | navigate, landmark_id: desk, ready    | ARRIVED         | true      |
+| Ambiguous     | clarify, question: "A or B?", ready   | CLARIFY         | false     |
+| Stale sensor  | navigate, landmark_id: desk, stale    | NOT_READY       | false     |
+| Path blocked  | navigate, landmark_id: desk, blocked  | NO_PATH         | false     |
+| Nav failed    | navigate, landmark_id: desk, failed   | FAILED          | true      |
+| Nav timeout   | navigate, landmark_id: desk, timeout  | TIMEOUT         | true      |
+| Robot busy    | navigate, landmark_id: desk, busy     | BUSY            | false     |
+| Cancel        | cancel, busy                          | CANCELED        | false     |
+| Unknown dest  | navigate, landmark_id: invented       | REJECTED        | false     |
+
+Note: navigation_backend is "mock" in all cases. "goal_sent: true" indicates the offline
+flow reached the dispatch branch; no physical robot motion occurs.
+
+D. Unit Test Results
+
+Command: python3 -m unittest discover -s tests -v
+Result: Ran 9 tests in 0.001s — OK (all pass)
+
+Tests verified:
+  - Valid navigate goal returns ARRIVED with demo_only=true and navigation_backend=mock
+  - Unknown landmark is rejected without dispatch
+  - Arbitrary coordinate field (extra schema field) is rejected
+  - Bad schema types (list, empty dict, wrong types) are rejected
+  - Stale/blocked/busy scenarios do not dispatch (goal_sent=false)
+  - Clarify intent does not dispatch
+  - FAILED and TIMEOUT are not ARRIVED
+  - Cancel does not claim real stop (stop_confirmed=false)
+  - Empty question string is rejected
+
+E. Source Repository
+
+Repository: https://github.com/hank050392/tb3-navigation-agent
+Branch: main (source commit: 1c322b8)
+Assignment branch: dic4-iceib-paper
+
+─────────────────────────────────────────────────────────────────────────────
+V. EVALUATION AND RESULTS
+─────────────────────────────────────────────────────────────────────────────
+
+A. Offline Contract Evaluation (Completed)
+
+The offline prototype satisfies all contract requirements verified by the unit test suite.
+The contract covers: schema correctness enforcement, landmark whitelist exclusivity,
+no dispatch on invalid inputs or adverse status scenarios, correct stop_confirmed=false
+for cancel, and evidence fields in all outputs. These tests do not evaluate LLM accuracy,
+navigation success rate, or physical robot behavior.
+
+B. Planned Comparative Evaluation (Not Yet Executed)
+
+Three navigation interface methods are designed for comparison (from EXPERIMENTS.md):
+
+  B0: Fixed landmark menu + Nav2 (baseline; no natural language)
+  B1: LLM-direct parsing + schema/whitelist + Nav2
+  B2: Full agent (B1 + clarification + status check + evidence reporting)
+
+Planned dataset: 60 Chinese commands across six categories (clear destination, ambiguous,
+unknown location, cancel, compound, conflicting input), 20 development / 40 test.
+Planned simulation scenarios: open space, narrow corridor, added obstacle, abnormal
+status/unreachable. 40 runs per method (simulation), 36 runs (physical, 12 pairs × 3
+methods).
+
+Planned metrics:
+  - Processing accuracy: correct intent/goal/clarify / total commands
+  - Improper dispatch rate: dispatched when should not / total should-not-dispatch cases
+  - Task completion rate: action SUCCEEDED + within goal tolerance / all defined reachable
+  - Navigation success rate: succeeded / correctly dispatched reachable tasks
+  - Report accuracy: report consistent with action result / total reports
+  - Latency (p50/p95): parse latency, dispatch latency, feedback latency
+  - Path length, collision count, clearance (simulation ground truth; physical camera check)
+
+Ablations: (A) remove clarification; (B) remove pre-dispatch status check.
+
+[Table II: Planned Evaluation Design Summary]
+
+| Metric                | Scope     | Method(s)    | Status         |
+|-----------------------|-----------|--------------|----------------|
+| Processing accuracy   | B1, B2    | NL commands  | Not yet executed |
+| Improper dispatch rate| B1, B2    | Invalid cases| Not yet executed |
+| Task completion rate  | B0,B1,B2  | Sim+Physical | Not yet executed |
+| Navigation success    | B0,B1,B2  | Sim+Physical | Not yet executed |
+| Report accuracy       | B1, B2    | All cases    | Not yet executed |
+| Parse latency p50/p95 | B1, B2    | NL commands  | Not yet executed |
+| Dispatch latency      | B1, B2    | Dispatched   | Not yet executed |
+
+No numerical navigation or LLM results exist at the time of this paper submission.
+data/results_template.csv provides column headers for future result recording.
+
+─────────────────────────────────────────────────────────────────────────────
+VI. LIMITATIONS AND FUTURE WORK
+─────────────────────────────────────────────────────────────────────────────
+
+Current limitations of the prototype include:
+(1) No LLM integration: Chinese natural language is not yet parsed; the prototype accepts
+    pre-structured JSON only.
+(2) No ROS 2 / Nav2 integration: navigation outcomes are mocked; no physical robot is
+    controlled.
+(3) No live sensor checks: stale/busy/blocked states are injected via CLI scenario flag,
+    not read from real robot sensors.
+(4) Single flat indoor environment: the design scope covers one TurtleBot3 Burger, one
+    pre-built 2D map, human-named registered destinations.
+(5) No dynamic obstacle handling: the LiDAR-based collision avoidance relies on Nav2's
+    built-in recovery behaviors; real-time dynamic objects are not modeled.
+
+Planned future work includes:
+  - Connecting an LLM with structured output to the intent parser module
+  - Implementing the mission manager with single-active-goal enforcement
+  - Implementing the Nav2 adapter with path feasibility check and action server monitoring
+  - Executing the B0/B1/B2 comparative experiment with real sensor and navigation data
+  - Extending to multi-destination tasks and long-term map maintenance
+
+─────────────────────────────────────────────────────────────────────────────
+VII. CONCLUSION
+─────────────────────────────────────────────────────────────────────────────
+
+This paper presents the design and offline prototype evaluation of a Chinese-language
+task-decision agent for TurtleBot3 Burger indoor navigation. The agent architecture
+separates intent parsing, landmark validation, and navigation dispatch into verifiable
+layers. The offline prototype implements seven outcome states, three registered landmarks,
+and schema-enforced validation, confirmed by nine passing unit tests. All test scenarios
+produce expected outputs with no physical robot motion.
+
+The paper clearly distinguishes implemented offline behavior—schema validation, whitelist
+rejection, mock outcome branching—from planned integration: LLM parsing, live sensor
+checks, and ROS 2/Nav2 dispatch. No navigation success rates, LLM accuracy figures, or
+physical timing measurements are reported, as none have been measured at this stage.
+
+This work contributes a structured evaluation design and evidence-grounded reporting
+framework for future full-system experiments comparing fixed menu, direct LLM, and full
+agent navigation interfaces. The design follows the evidence standards of the ICEIB
+conference and the DIC4 course requirements.
+
+─────────────────────────────────────────────────────────────────────────────
+ACKNOWLEDGMENT
+─────────────────────────────────────────────────────────────────────────────
+
+The offline prototype, system design, and project documentation were developed
+collaboratively by Group 7 (DIC course). Team members: Chen Zhi-Heng (陳至恆,
+7115064009), Hsiao Cheng-Hao (蕭丞皓, 7115064186), Lin Jui-Yu (林瑞裕, 7115064168),
+Chiu Li-Mei (邱秝美, 7115064159), Kuan Yi-Kai (官奕愷, 7115093001). This individual
+assignment paper is submitted by Chiu Li-Mei, focusing on design analysis and offline
+evaluation, based on the shared group project repository.
+
+─────────────────────────────────────────────────────────────────────────────
+REFERENCES
+─────────────────────────────────────────────────────────────────────────────
+
+[1] S. Yao et al., "ReAct: Synergizing Reasoning and Acting in Language Models," in
+    Proc. ICLR 2023, arXiv:2210.03629.
+
+[2] M. Ahn et al., "Do As I Can, Not As I Say: Grounding Language in Robotic
+    Affordances," in Proc. CoRL 2022, arXiv:2204.01691.
+
+[3] D. Pollini, B. V. Guterres, R. S. Guerra, and R. B. Grando, "Reducing Latency in
+    LLM-Based Natural Language Commands Processing for Robot Navigation," accepted to
+    IEEE INDIN 2025, arXiv:2506.00075.
+
+[4] S. Macenski, F. Martín, R. White, and J. G. Clavero, "The Marathon 2: A Navigation
+    System," in Proc. IEEE/RSJ IROS 2020, arXiv:2003.00368.
+
+[5] S. Macenski and I. Jambrecic, "SLAM Toolbox: SLAM for the Dynamic World," J. Open
+    Source Softw., vol. 6, no. 61, p. 2783, 2021, doi:10.21105/joss.02783.
+
+[6] X. Xiao et al., "Autonomous Ground Navigation in Highly Constrained Spaces: Lessons
+    Learned from the BARN Challenge at ICRA 2022," IEEE Robot. Autom. Mag.,
+    arXiv:2208.10473.
+
+[7] M. El-Hariry et al., "NavBench: A Unified Robotics Benchmark for Reinforcement
+    Learning-Based Autonomous Navigation," arXiv:2505.14526, 2025.
+
+[8] ROBOTIS, "TurtleBot3 Features and Navigation," ROBOTIS e-Manual, accessed
+    2026-10-30. [Online]. Available: https://emanual.robotis.com/docs/en/platform/
+    turtlebot3/features/
+
+[9] ROS Navigation Maintainers, "Nav2 Tuning Guide," Nav2 Documentation, accessed
+    2026-10-30. [Online]. Available: https://docs.nav2.org/jazzy/configuration_and_
+    development/tuning_guide/
+
+[10] ROS Navigation Maintainers, "Nav2 Simple Commander API," Nav2 Documentation,
+     accessed 2026-10-30. [Online]. Available: https://docs.nav2.org/jazzy/
+     configuration_and_development/simple_commander_api/simple_commander_api/
+
+[11] ROS Navigation Maintainers, "Nav2 Collision Monitor," GitHub Repository,
+     accessed 2026-10-30. [Online]. Available: https://github.com/ros-navigation/
+     navigation2/blob/main/nav2_collision_monitor/README.md
+
+[12] X. Xiao and BARN Organizers, "The BARN Challenge 2026," George Mason University,
+     accessed 2026-10-30. [Online]. Available: https://people.cs.gmu.edu/~xiao/
+     Research/BARN_Challenge/BARN_Challenge26.html
+
+─────────────────────────────────────────────────────────────────────────────
+END OF PAPER
+─────────────────────────────────────────────────────────────────────────────
+
+AUTHOR NOTE (placeholder — confirm before final submission):
+  Corresponding author: Chiu Li-Mei (邱秝美)
+  Student ID: 7115064159
+  Affiliation: [University/Department — to be confirmed]
+  Email: [student email — to be confirmed]
+  Submission: DIC4 Personal Assignment — ICEIB Conference Paper Draft
+  Source repo: https://github.com/hank050392/tb3-navigation-agent (commit 1c322b8)
+  Assignment branch: https://github.com/hank050392/tb3-navigation-agent/tree/dic4-iceib-paper
