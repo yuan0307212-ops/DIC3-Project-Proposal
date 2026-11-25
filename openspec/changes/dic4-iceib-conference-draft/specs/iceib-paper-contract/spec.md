@@ -35,7 +35,7 @@ Evaluation, Limitations, Conclusion, References).
 demo scenarios (9 cases, actual outputs documented in tasks.md).
 
 ### REQ-05: Attribution
-**SHALL** identify Chiu Li-Mei as individual assignment author.
+**SHALL** identify the individual assignment author (using confirmed name or placeholder).
 **MUST** attribute Group 7 collaborative project in Acknowledgment.
 **WHEN** paper correctly attributes individual vs. group contributions **THEN** satisfied.
 **Status:** ✅ Satisfied — author block and acknowledgment section present.

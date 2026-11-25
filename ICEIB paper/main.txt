@@ -1,6 +1,6 @@
 An Indoor Navigation Task-Decision Agent for TurtleBot3 Burger: Design and Offline Prototype Evaluation
 
-Personal Assignment — DIC4 | Submitted by: Chiu Li-Mei (邱秝美), Student ID 7115064159
+Personal Assignment — DIC4 | Submitted by: [Author — to be confirmed]
 Based on group project by Group 7, source commit: 1c322b8 (hank050392/tb3-navigation-agent, main)
 
 ─────────────────────────────────────────────────────────────────────────────
@@ -350,11 +350,9 @@ ACKNOWLEDGMENT
 ─────────────────────────────────────────────────────────────────────────────
 
 The offline prototype, system design, and project documentation were developed
-collaboratively by Group 7 (DIC course). Team members: Chen Zhi-Heng (陳至恆,
-7115064009), Hsiao Cheng-Hao (蕭丞皓, 7115064186), Lin Jui-Yu (林瑞裕, 7115064168),
-Chiu Li-Mei (邱秝美, 7115064159), Kuan Yi-Kai (官奕愷, 7115093001). This individual
-assignment paper is submitted by Chiu Li-Mei, focusing on design analysis and offline
-evaluation, based on the shared group project repository.
+collaboratively by Group 7 (DIC course). This individual assignment paper is based
+on the shared group project repository:
+https://github.com/hank050392/tb3-navigation-agent
 
 ─────────────────────────────────────────────────────────────────────────────
 REFERENCES
@@ -408,8 +406,8 @@ END OF PAPER
 ─────────────────────────────────────────────────────────────────────────────
 
 AUTHOR NOTE (placeholder — confirm before final submission):
-  Corresponding author: Chiu Li-Mei (邱秝美)
-  Student ID: 7115064159
+  Corresponding author: [Author Name — to be confirmed]
+  Student ID: [Student ID — to be confirmed]
   Affiliation: [University/Department — to be confirmed]
   Email: [student email — to be confirmed]
   Submission: DIC4 Personal Assignment — ICEIB Conference Paper Draft

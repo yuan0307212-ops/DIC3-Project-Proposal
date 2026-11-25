@@ -2,7 +2,7 @@
 %  main.tex  --  ICEIB Conference Paper (IEEE IEEEtran format)
 %  Title: An Indoor Navigation Task-Decision Agent for
 %         TurtleBot3 Burger: Design and Offline Prototype Evaluation
-%  Author: Chiu Li-Mei (邱秝美) — DIC4 Personal Assignment
+%  Author: [Author — to be confirmed] — DIC4 Personal Assignment
 %  Source group project: https://github.com/hank050392/tb3-navigation-agent
 %  Compile: pdflatex main.tex  (twice for cross-references)
 %           or: latexmk -pdf main.tex
@@ -28,7 +28,7 @@
 % ---- Metadata ----
 \hypersetup{
   pdftitle={An Indoor Navigation Task-Decision Agent for TurtleBot3 Burger},
-  pdfauthor={Chiu Li-Mei},
+  pdfauthor={DIC4 Assignment Author},
   colorlinks=true,
   linkcolor=blue,
   citecolor=blue,
@@ -45,18 +45,16 @@ Design and Offline Prototype Evaluation}
 % NOTE: English name, affiliation, and email to be confirmed by student.
 % Placeholder strings are compilable; replace before final submission.
 \author{
-  \IEEEauthorblockN{Chiu Li-Mei\,\textsuperscript{*}}
+  \IEEEauthorblockN{[Author Name --- to be confirmed]\,\textsuperscript{*}}
   \IEEEauthorblockA{
     \textit{[Department --- to be confirmed]}\\
     \textit{[University --- to be confirmed]}\\
-    Student ID: 7115064159\\
     Email: [student-email@university.edu --- to be confirmed]
   }
   \and
   \IEEEauthorblockN{(Group 7 Collaborators\,\textsuperscript{\dag})}
   \IEEEauthorblockA{
-    Chen Zhi-Heng, Hsiao Cheng-Hao,\\
-    Lin Jui-Yu, Kuan Yi-Kai\\
+    [Names --- to be confirmed]\\
     \textit{Shared group project — hank050392/tb3-navigation-agent}
   }
 }
@@ -114,9 +112,8 @@ produce a result report grounded in the navigation action result---not in a
 language-model guess.
 
 \smallskip\noindent\textit{Attribution.} This work is a DIC4 personal assignment
-submitted by Chiu Li-Mei (邱秝美, Student ID 7115064159), reporting on the offline
-prototype contribution of Group~7's collaborative project (source commit:
-\texttt{1c322b8}, repository: \texttt{hank050392/tb3-navigation-agent}).
+reporting on the offline prototype contribution of Group~7's collaborative project
+(source commit: \texttt{1c322b8}, repository: \texttt{hank050392/tb3-navigation-agent}).
 
 The main contributions of this paper are:
 \begin{enumerate}
@@ -250,8 +247,8 @@ The offline prototype validates four intent types:
   \item \texttt{reject}: \{``intent'': ``reject'', ``reason'': \textit{str}\}
 \end{itemize}
 Extra fields in any request are rejected. Registered offline demo landmarks:
-\texttt{desk} (實驗桌, $x$=1.0, $y$=1.0), \texttt{door\_a} (A門口, $x$=2.0, $y$=0.0),
-\texttt{door\_b} (B門口, $x$=0.0, $y$=2.0). Coordinates are offline demo values only.
+\texttt{desk} (experiment desk, $x$=1.0, $y$=1.0), \texttt{door\_a} (Door A, $x$=2.0, $y$=0.0),
+\texttt{door\_b} (Door B, $x$=0.0, $y$=2.0). Coordinates are offline demo values only.
 
 \subsection{Decision Algorithm}
 
@@ -432,10 +429,8 @@ full agent navigation interfaces.
 \section*{Acknowledgment}
 
 The offline prototype, system design, and project documentation were developed
-collaboratively by Group~7 (DIC course). Team members: Chen Zhi-Heng (陳至恆),
-Hsiao Cheng-Hao (蕭丞皓), Lin Jui-Yu (林瑞裕), Chiu Li-Mei (邱秝美), and
-Kuan Yi-Kai (官奕愷). This individual assignment paper is submitted by Chiu Li-Mei,
-based on the shared group project repository
+collaboratively by Group~7 (DIC course). This individual assignment paper is based
+on the shared group project repository
 (\url{https://github.com/hank050392/tb3-navigation-agent}).
 
 % ============================================================

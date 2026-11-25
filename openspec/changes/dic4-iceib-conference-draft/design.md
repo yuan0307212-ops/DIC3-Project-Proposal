@@ -19,7 +19,7 @@ for an "Evaluation" framing (of the offline prototype), not merely a plan.
 Fabricating results would violate academic integrity.
 
 ### D3: Author Attribution
-**Decision:** Paper is authored by Chiu Li-Mei as individual assignment.
+**Decision:** Paper is authored by the individual assignment submitter (placeholder until confirmed).
 Group 7 members listed in Acknowledgment. Group project repository attributed.
 
 **Rationale:** This is a personal assignment based on shared group work.

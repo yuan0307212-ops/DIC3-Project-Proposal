@@ -4,7 +4,7 @@
 `dic4-iceib-conference-draft`
 
 ## Author
-Chiu Li-Mei (邱秝美), Student ID 7115064159 — DIC4 Personal Assignment
+[Author — to be confirmed] — DIC4 Personal Assignment
 
 ## Source Project
 Group 7 collaborative project: https://github.com/hank050392/tb3-navigation-agent  
@@ -57,5 +57,5 @@ are claimed. No results have been fabricated.
 
 The offline prototype, system design, and project documentation were developed
 collaboratively by Group 7. This paper is submitted as an individual assignment by
-Chiu Li-Mei, focusing on design analysis and offline evaluation, with appropriate
+the individual submitter, focusing on design analysis and offline evaluation, with appropriate
 attribution to the group project.

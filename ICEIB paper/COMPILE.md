@@ -55,7 +55,7 @@ The author block contains placeholder strings for affiliation and email
 ## Assignment Context
 
 - Course: DIC4
-- Student: 邱秝美 (Chiu Li-Mei), Student ID 7115064159
+- Student: [Author Name — to be confirmed]
 - Conference target: ICEIB (https://www.iceib.asia/)
 - Source repo: https://github.com/hank050392/tb3-navigation-agent
 - Assignment branch: dic4-iceib-paper
